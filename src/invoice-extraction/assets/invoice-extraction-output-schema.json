@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local-inference/invoice-extraction-output-schema.json",
+  "title": "InvoiceExtractionResponse",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["results"],
+  "properties": {
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "document_title",
+          "invoice_date",
+          "invoice_number",
+          "currency_code",
+          "gross_amount",
+          "seller",
+          "end_customer",
+          "purchases"
+        ],
+        "properties": {
+          "document_title": {
+            "type": ["string", "null"]
+          },
+          "invoice_date": {
+            "type": ["string", "null"]
+          },
+          "invoice_number": {
+            "type": ["string", "null"]
+          },
+          "currency_code": {
+            "type": ["string", "null"]
+          },
+          "gross_amount": {
+            "type": ["number", "null"]
+          },
+          "seller": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "city", "state", "country"],
+            "properties": {
+              "name": {
+                "type": ["string", "null"]
+              },
+              "city": {
+                "type": ["string", "null"]
+              },
+              "state": {
+                "type": ["string", "null"]
+              },
+              "country": {
+                "type": ["string", "null"]
+              }
+            }
+          },
+          "end_customer": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "city", "state", "country", "email"],
+            "properties": {
+              "name": {
+                "type": ["string", "null"]
+              },
+              "city": {
+                "type": ["string", "null"]
+              },
+              "state": {
+                "type": ["string", "null"]
+              },
+              "country": {
+                "type": ["string", "null"]
+              },
+              "email": {
+                "type": ["string", "null"]
+              }
+            }
+          },
+          "purchases": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "quantity",
+                "part_number",
+                "description",
+                "serial_numbers",
+                "unit_price"
+              ],
+              "properties": {
+                "quantity": {
+                  "type": ["number", "null"]
+                },
+                "part_number": {
+                  "type": ["string", "null"]
+                },
+                "description": {
+                  "type": ["string", "null"]
+                },
+                "serial_numbers": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "unit_price": {
+                  "type": ["number", "null"]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
