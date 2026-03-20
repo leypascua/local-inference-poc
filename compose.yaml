@@ -9,8 +9,10 @@ services:
       --port 8080
       --allowed-local-media-path /tmp/invoice-extraction
       --trust-remote-code
-      --gpu-memory-utilization 0.95
-      --max-model-len 32768
+      --gpu-memory-utilization 0.80
+      --max-model-len 4096
+      --max-num-batched-tokens 4096
+      --enforce-eager
     ports:
       - 8080:8080
     volumes:

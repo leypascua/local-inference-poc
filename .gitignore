@@ -1,6 +1,8 @@
 .DS_Store
 tmp/
 
+node_modules
+
 src/invoice-extraction/node_modules/
 src/invoice-extraction/dist/
 src/invoice-extraction/.env

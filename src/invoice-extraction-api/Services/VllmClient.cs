@@ -14,6 +14,7 @@ public sealed partial class VllmClient(IHttpClientFactory httpClientFactory)
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly string _schemaAsset = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Assets", "invoice-extraction-output-schema.json"));
     private readonly string _promptAsset = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Assets", "invoice-extraction-prompt.md")).Trim();
+    private readonly JsonObject? _structuredResponseSchema = ParseStructuredResponseSchema(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Assets", "invoice-extraction-output-schema.json")));
 
     public async Task<JsonNode> ExtractAsync(InvoiceExtractionOptions options, List<PreparedImageFile> images, CancellationToken cancellationToken)
     {
@@ -124,12 +125,12 @@ public sealed partial class VllmClient(IHttpClientFactory httpClientFactory)
             }
         };
 
-        if (mode == "json_schema")
+        if (mode == "json_schema" && _structuredResponseSchema is not null)
         {
-            body["json_schema"] = JsonNode.Parse(_schemaAsset);
+            body["json_schema"] = _structuredResponseSchema.DeepClone();
         }
 
-        if (mode == "response_format")
+        if (mode == "response_format" && _structuredResponseSchema is not null)
         {
             body["response_format"] = new JsonObject
             {
@@ -138,7 +139,7 @@ public sealed partial class VllmClient(IHttpClientFactory httpClientFactory)
                 {
                     ["name"] = "invoice_extraction_response",
                     ["strict"] = true,
-                    ["schema"] = JsonNode.Parse(_schemaAsset)
+                    ["schema"] = _structuredResponseSchema.DeepClone()
                 }
             };
         }
@@ -182,6 +183,23 @@ public sealed partial class VllmClient(IHttpClientFactory httpClientFactory)
         }
 
         return _promptAsset;
+    }
+
+    private static JsonObject? ParseStructuredResponseSchema(string? schemaAsset)
+    {
+        if (string.IsNullOrWhiteSpace(schemaAsset))
+        {
+            return null;
+        }
+
+        try
+        {
+            return JsonNode.Parse(schemaAsset) as JsonObject;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 
     private static string ExtractMessageContent(JsonNode? payload)
