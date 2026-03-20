@@ -1,38 +1,35 @@
 services:
-  llamacpp-server:
-    image: ghcr.io/ggml-org/llama.cpp:server-cuda
+  vllm-server:
+    build:
+      context: ./src/vllm-server
     gpus: all
-    ports: 
+    command: >-
+      --model zai-org/GLM-OCR
+      --host 0.0.0.0
+      --port 8080
+      --allowed-local-media-path /tmp/invoice-extraction
+      --trust-remote-code
+      --gpu-memory-utilization 0.95
+      --max-model-len 32768
+    ports:
       - 8080:8080
     volumes:
-      - ~/.lmstudio/models:/models
+      - ~/.cache/huggingface:/root/.cache/huggingface
+      - ./tmp:/tmp/invoice-extraction
     environment:
-      # alternatively, you can use "LLAMA_ARG_MODEL_URL" to download the model
-      LLAMA_ARG_MODEL: /models/unsloth/Qwen3.5-4B-GGUF/Qwen3.5-4B-Q8_0.gguf
-      LLAMA_ARG_MMPROJ: /models/unsloth/Qwen3.5-4B-GGUF/mmproj-F32.gguf
-      LLAMA_ARG_ALIAS: Qwen3.5-4B-Q8
-      LLAMA_ARG_CTX_SIZE: 16384
-      LLAMA_ARG_N_GPU_LAYERS: all
-      LLAMA_ARG_N_PARALLEL: 1
-      LLAMA_ARG_FLASH_ATTN: on
-      LLAMA_ARG_IMAGE_MIN_TOKENS: 1024
-      LLAMA_ARG_THINK_BUDGET: 0
-      LLAMA_ARG_CACHE_RAM: 0
-      LLAMA_ARG_ENDPOINT_METRICS: 1
-      LLAMA_ARG_HOST: 0.0.0.0
-      LLAMA_ARG_PORT: 8080
+      HF_TOKEN: ${HF_TOKEN:-}
 
   invoice-extraction-api:
     build:
-      context: ./src/invoice-extraction
+      context: ./src/invoice-extraction-api
     depends_on:
-      - llamacpp-server
+      - vllm-server
     environment:
       PORT: 9998
       HOST: 0.0.0.0
       TEMP_DIR: /tmp/invoice-extraction
-      LLAMA_BASE_URL: http://llamacpp-server:8080
-      LLAMA_MODEL: Qwen3.5-4B-Q8
+      VLLM_BASE_URL: http://vllm-server:8080
+      VLLM_MODEL: zai-org/GLM-OCR
       ALLOW_REMOTE_URLS: "true"
       KEEP_DEBUG_FILES: "true"
       REQUEST_TIMEOUT_MS: 120000

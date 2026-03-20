@@ -4,3 +4,5 @@ tmp/
 src/invoice-extraction/node_modules/
 src/invoice-extraction/dist/
 src/invoice-extraction/.env
+
+.env
