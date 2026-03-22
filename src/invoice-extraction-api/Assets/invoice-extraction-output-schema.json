@@ -73,8 +73,11 @@
                   "quantity": {
                     "type": ["number", "null"]
                   },
-                  "part_number": {
-                    "type": ["string", "null"]
+                  "product_numbers": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
                   },
                   "description": {
                     "type": ["string", "null"]
@@ -89,7 +92,7 @@
                     "type": ["number", "null"]
                   }
                 },
-                "required": ["quantity", "description", "serial_numbers", "unit_price"],
+                "required": ["quantity", "product_numbers", "description", "serial_numbers", "unit_price"],
                 "additionalProperties": false
               }
             }

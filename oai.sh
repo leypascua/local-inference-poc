@@ -2,13 +2,19 @@
 
 set -euo pipefail
 
-BASE_URL="${VLLM_BASE_URL:-http://localhost:8080}"
-MODEL="${VLLM_MODEL:-zai-org/GLM-OCR}"
-API_KEY="${VLLM_API_KEY:-}"
+# Load .env file if it exists in the current directory
+if [[ -f ".env" ]]; then
+  # shellcheck source=/dev/null
+  source ".env"
+fi
+
+BASE_URL="${OPENAI_BASE_URL:-http://localhost:8000}"
+MODEL="${OPENAI_MODEL:-}"
+API_KEY="${OPENAI_API_KEY:-}"
 
 usage() {
-  cat <<'EOF'
-Usage: ./vllmc.sh --input image.jpg --prompt instructions.md [OPTIONS]
+  cat <<EOF
+Usage: $0 --input image.jpg --prompt instructions.md [OPTIONS]
 
 Options:
   --input PATH    Input document image, PDF, or HTTP/S URL (required)
@@ -19,9 +25,11 @@ Options:
   --help          Show this help message
 
 Environment:
-  VLLM_BASE_URL   Base URL for the vLLM server (default: http://localhost:8080)
-  VLLM_MODEL      Model name (default: zai-org/GLM-OCR)
-  VLLM_API_KEY    Optional bearer token
+  OPENAI_BASE_URL   Base URL for the OpenAI-compatible API server (default: http://localhost:8000)
+  OPENAI_MODEL      Model name (required)
+  OPENAI_API_KEY    Optional bearer token
+                    
+  Environment variables can also be set in a .env file in the current directory.
 EOF
 }
 
@@ -104,6 +112,7 @@ done
 
 [[ -n "$INPUT_PATH" ]] || die "--input is required"
 [[ -n "$PROMPT_PATH" ]] || die "--prompt is required"
+[[ -n "$MODEL" ]] || die "OPENAI_MODEL environment variable is required"
 
 DOWNLOADED_FILE=""
 if [[ "$INPUT_PATH" =~ ^https?:// ]]; then
@@ -230,7 +239,7 @@ if schema_arg:
         body["response_format"] = {
             "type": "json_schema",
             "json_schema": {
-                "name": "vllmc_response",
+                "name": "extracted_data",
                 "strict": True,
                 "schema": schema_wrapper,
             },
