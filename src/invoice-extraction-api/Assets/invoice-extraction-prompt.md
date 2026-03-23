@@ -1,37 +1,5 @@
-Output JSON in this exact format:
-{
-  "results": [
-    {
-      "document_title": "",
-      "invoice_date": "",
-      "invoice_number": "",
-      "currency_code": "",
-      "gross_amount": null,
-      "seller": {
-        "name": "",
-        "city": "",
-        "state": "",
-        "country": ""
-      },
-      "end_customer": {
-        "name": "",
-        "city": "",
-        "state": "",
-        "country": "",
-        "email": ""
-      },
-      "purchases": [
-        {
-          "quantity": null,
-          "product_numbers": [],
-          "description": "",
-          "serial_numbers": [],
-          "unit_price": null
-        }
-      ]
-    }
-  ]
-}
+Task: 
+Extract proof-of-purchase data from commercial documents (invoices, receipts, delivery receipts, purchase orders). Return `{"results":[]}` if no qualifying document found.
 
 Output contract:
 - Output must be a single parseable JSON object
@@ -39,9 +7,6 @@ Output contract:
 - Start with `{` and end with `}`
 - Use `null` for unknown/missing scalar values
 - Use `[]` for missing arrays
-
-Task: 
-Extract proof-of-purchase data from commercial documents (invoices, receipts, delivery receipts, purchase orders). Return `{"results":[]}` if no qualifying document found.
 
 Field rules:
 - `document_title`: Document type only - one of: "invoice", "sales invoice", "receipt", "delivery receipt", "purchase order", "credit memo", "debit note", or `null`. NOT a product name, company name, or content title.
@@ -79,6 +44,7 @@ HP-specific guidance:
   - There are 2 types of product numbers: 
     - SKU: EXACTLY 7 chars (e.g., `AB1C2DE`) OR 11 chars with `#` in position 8 (e.g., `AB1C2DE#EFG`). Values of 10-13 chars without `#` are serial_numbers, NOT product_numbers.  
     - HP Laptop Model: `<2-digits>-<8-alphanumeric>`. Examples: `13-fa5yx4au`, `15-tf392kph`
+  - Extracted value for `product_number` must exist in actual `description` or dedicated product number column (e.g., `part_number`, `item_number`, `article_number`, `product_number`)
 - `serial_numbers`: 10-13 alphanumeric chars, no prefixes. Examples: `AB123456789`, `PH382F31US`, `5CG538240Z`. Usually preceded by labels: `SN#`, `Serial:`, `SNo:`, `SN:`. These are NOT product_numbers.
 
 Example output (format only - never copy these placeholder values):
