@@ -9,7 +9,8 @@ public sealed class ExtractionPipelineService(
     TempFileService tempFileService,
     FileLoaderService fileLoaderService,
     PdfRasterizerService pdfRasterizerService,
-    VllmClient vllmClient,
+    ImagePreparationService imagePreparationService,
+    OpenAiClient openAiClient,
     ExtractionNormalizer normalizer)
 {
     public async Task<ExtractionResponse> RunAsync(string requestId, InvoiceExtractionRequest request, CancellationToken cancellationToken)
@@ -30,12 +31,7 @@ public sealed class ExtractionPipelineService(
                 }
                 else
                 {
-                    images.Add(new PreparedImageFile
-                    {
-                        FilePath = file.FilePath,
-                        FileName = file.StoredName,
-                        ContentType = file.ContentType
-                    });
+                    images.Add(await imagePreparationService.PrepareUploadedImageAsync(requestDir, file, cancellationToken));
                 }
 
                 if (images.Count > options.MaxTotalImages)
@@ -44,7 +40,7 @@ public sealed class ExtractionPipelineService(
                 }
             }
 
-            var modelOutput = await vllmClient.ExtractAsync(options, images, cancellationToken);
+            var modelOutput = await openAiClient.ExtractAsync(options, images, cancellationToken);
             return normalizer.NormalizeAndValidate(modelOutput);
         }
         finally

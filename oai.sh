@@ -11,6 +11,8 @@ fi
 BASE_URL="${OPENAI_BASE_URL:-http://localhost:8000}"
 MODEL="${OPENAI_MODEL:-}"
 API_KEY="${OPENAI_API_KEY:-}"
+MAX_TOKENS="${OPENAI_MAX_TOKENS:-1024}"
+MAX_DIM_DEFAULT="1568"
 
 usage() {
   cat <<EOF
@@ -22,12 +24,16 @@ Options:
   --schema PATH   JSON schema file for structured output
   --dpi N         DPI for PDF rasterization (default: 150, lower uses less memory)
   --quality N     JPEG quality for PDF pages (default: 85, lower uses less memory)
+  --max-dim N     Maximum pixel dimension for the longest image edge (default: 1568)
+                  Images exceeding this are proportionally downscaled; use 0 to disable
+  --thinking      Enable reasoning/thinking mode (default: disabled)
   --help          Show this help message
 
 Environment:
   OPENAI_BASE_URL   Base URL for the OpenAI-compatible API server (default: http://localhost:8000)
   OPENAI_MODEL      Model name (required)
   OPENAI_API_KEY    Optional bearer token
+  OPENAI_MAX_TOKENS Maximum tokens in the completion response (default: 1024)
                     
   Environment variables can also be set in a .env file in the current directory.
 EOF
@@ -72,6 +78,8 @@ PROMPT_PATH=""
 SCHEMA_PATH=""
 PDF_DPI="150"
 JPEG_QUALITY="85"
+MAX_DIM="$MAX_DIM_DEFAULT"
+THINKING="false"
 
 while (($# > 0)); do
   case "$1" in
@@ -100,6 +108,15 @@ while (($# > 0)); do
       JPEG_QUALITY="$2"
       shift 2
       ;;
+    --max-dim)
+      (($# >= 2)) || die "--max-dim requires a value"
+      MAX_DIM="$2"
+      shift 2
+      ;;
+    --thinking)
+      THINKING="true"
+      shift
+      ;;
     --help|-h)
       usage
       exit 0
@@ -116,8 +133,7 @@ done
 
 DOWNLOADED_FILE=""
 if [[ "$INPUT_PATH" =~ ^https?:// ]]; then
-  URL_EXT="${INPUT_PATH##*.}"
-  DOWNLOADED_FILE="$(mktemp --suffix=".$URL_EXT")"
+  DOWNLOADED_FILE="$(mktemp)"
   curl -sS -L -o "$DOWNLOADED_FILE" "$INPUT_PATH" || die "Failed to download: $INPUT_PATH"
   INPUT_PATH="$DOWNLOADED_FILE"
 fi
@@ -130,6 +146,14 @@ fi
 
 require_command curl
 require_command python3
+
+if [[ ! "$MAX_DIM" =~ ^[0-9]+$ ]]; then
+  die "--max-dim must be a non-negative integer"
+fi
+
+if [[ "$MAX_DIM" != "0" ]]; then
+  python3 -c 'from PIL import Image' >/dev/null 2>&1 || die "Pillow is required for image downscaling; install it or use --max-dim 0"
+fi
 
 INPUT_MIME_TYPE="$(mime_type_for_file "$INPUT_PATH")"
 
@@ -155,7 +179,7 @@ else
   trap 'rm -f "$RESPONSE_FILE" "$DOWNLOADED_FILE"' EXIT
 fi
 
-python3 - "$INPUT_PATH" "$INPUT_MIME_TYPE" "$PROMPT_PATH" "$SCHEMA_PATH" "$MODEL" <<'PY' \
+python3 - "$INPUT_PATH" "$INPUT_MIME_TYPE" "$PROMPT_PATH" "$SCHEMA_PATH" "$MODEL" "$THINKING" "$MAX_TOKENS" "$MAX_DIM" "$JPEG_QUALITY" <<'PY' \
 | curl -sS -X POST "${BASE_URL%/}/v1/chat/completions" \
     -H "Content-Type: application/json" \
     "${AUTH_ARGS[@]}" \
@@ -166,6 +190,9 @@ import json
 import mimetypes
 import pathlib
 import sys
+from io import BytesIO
+
+from PIL import Image
 
 
 def read_text(path_str: str) -> str:
@@ -177,10 +204,36 @@ input_mime_type = sys.argv[2] or mimetypes.guess_type(str(input_path))[0] or "ap
 prompt_path = pathlib.Path(sys.argv[3])
 schema_arg = sys.argv[4]
 model_name = sys.argv[5]
+thinking_enabled = sys.argv[6] == "true"
+max_tokens = int(sys.argv[7])
+max_dim = int(sys.argv[8])
+jpeg_quality = int(sys.argv[9])
 
 prompt_text = read_text(str(prompt_path))
 if not prompt_text:
     raise SystemExit("Prompt file is empty")
+
+
+def maybe_downscale(image_bytes: bytes, mime_type: str) -> tuple[bytes, str]:
+    if max_dim <= 0:
+        return image_bytes, mime_type
+
+    with Image.open(BytesIO(image_bytes)) as image:
+        width, height = image.size
+        longest_edge = max(width, height)
+        if longest_edge <= max_dim:
+            return image_bytes, mime_type
+
+        scale = max_dim / longest_edge
+        resized = image.resize(
+            (max(1, round(width * scale)), max(1, round(height * scale))),
+            Image.Resampling.LANCZOS,
+        )
+        output = BytesIO()
+        resized.save(output, format="JPEG", quality=jpeg_quality)
+        resized.close()
+
+    return output.getvalue(), "image/jpeg"
 
 def build_image_content():
     if input_path.is_dir():
@@ -189,15 +242,17 @@ def build_image_content():
             raise SystemExit(f"No JPEG pages found in {input_path}")
         content = []
         for i, page in enumerate(pages, 1):
-            page_b64 = base64.b64encode(page.read_bytes()).decode("ascii")
+            page_bytes, page_mime_type = maybe_downscale(page.read_bytes(), "image/jpeg")
+            page_b64 = base64.b64encode(page_bytes).decode("ascii")
             content.append({
                 "type": "image_url",
-                "image_url": {"url": f"data:image/jpeg;base64,{page_b64}"},
+                "image_url": {"url": f"data:{page_mime_type};base64,{page_b64}"},
             })
         return content
     else:
-        input_b64 = base64.b64encode(input_path.read_bytes()).decode("ascii")
-        data_url = f"data:{input_mime_type};base64,{input_b64}"
+        single_image_bytes, single_image_mime_type = maybe_downscale(input_path.read_bytes(), input_mime_type)
+        input_b64 = base64.b64encode(single_image_bytes).decode("ascii")
+        data_url = f"data:{single_image_mime_type};base64,{input_b64}"
         return [{"type": "image_url", "image_url": {"url": data_url}}]
 
 image_content = build_image_content()
@@ -207,6 +262,7 @@ system_prompt = prompt_text + "\n\nReturn JSON only. Do not wrap the JSON in mar
 
 body = {
     "model": model_name,
+    "max_tokens": max_tokens,
     "temperature": 0,
     "messages": [
         {
@@ -224,6 +280,9 @@ body = {
         },
     ],
 }
+
+if not thinking_enabled:
+    body["reasoning_effort"] = "none"
 
 if schema_arg:
     schema_text = read_text(schema_arg)

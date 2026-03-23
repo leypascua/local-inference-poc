@@ -1,6 +1,62 @@
-@invoice_extraction_api_HostAddress = http://localhost:5086
+@invoice_extraction_api_HostAddress = http://localhost:9998
 
-GET {{invoice_extraction_api_HostAddress}}/weatherforecast/
+### Liveness
+GET {{invoice_extraction_api_HostAddress}}/health/live
 Accept: application/json
 
 ###
+
+### Readiness
+GET {{invoice_extraction_api_HostAddress}}/health/ready
+Accept: application/json
+
+###
+
+### Extract invoice from remote image URL
+POST {{invoice_extraction_api_HostAddress}}/invoices/extract/
+Content-Type: application/json
+Accept: application/json
+
+{
+  "content": [
+    {
+      "name": "invoice.jpg",
+      "content_type": "image/jpeg",
+      "file_url": "https://example.com/invoice.jpg"
+    }
+  ]
+}
+
+###
+
+### Extract invoice from remote PDF URL
+POST {{invoice_extraction_api_HostAddress}}/invoices/extract/
+Content-Type: application/json
+Accept: application/json
+
+{
+  "content": [
+    {
+      "name": "invoice.pdf",
+      "content_type": "application/pdf",
+      "file_url": "https://example.com/invoice.pdf"
+    }
+  ]
+}
+
+###
+
+### Extract invoice from base64 image bytes
+POST {{invoice_extraction_api_HostAddress}}/invoices/extract/
+Content-Type: application/json
+Accept: application/json
+
+{
+  "content": [
+    {
+      "name": "invoice.png",
+      "content_type": "image/png",
+      "file_url": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wn8sZ8AAAAASUVORK5CYII="
+    }
+  ]
+}

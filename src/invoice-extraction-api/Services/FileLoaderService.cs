@@ -18,7 +18,6 @@ public sealed partial class FileLoaderService(IHttpClientFactory httpClientFacto
 
         var loaded = new List<LoadedSourceFile>();
         var seenNames = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        long totalBytes = 0;
 
         foreach (var item in items)
         {
@@ -34,15 +33,9 @@ public sealed partial class FileLoaderService(IHttpClientFactory httpClientFacto
                 throw new AppException(400, "empty_file", $"{originalName} did not contain any file bytes.");
             }
 
-            if (bytes.Length > options.MaxFileBytes)
+            if (bytes.Length > options.MaxFileSizeBytes)
             {
-                throw new AppException(413, "payload_too_large", $"{originalName} exceeds MAX_FILE_BYTES.");
-            }
-
-            totalBytes += bytes.Length;
-            if (totalBytes > options.MaxTotalBytes)
-            {
-                throw new AppException(413, "payload_too_large", "Request exceeds MAX_TOTAL_BYTES.");
+                throw new AppException(413, "payload_too_large", $"{originalName} exceeds MAX_FILE_SIZE.");
             }
 
             await File.WriteAllBytesAsync(filePath, bytes, cancellationToken);
@@ -98,9 +91,9 @@ public sealed partial class FileLoaderService(IHttpClientFactory httpClientFacto
             throw new AppException(502, "remote_fetch_failed", $"Unable to download {item.Name}.", new { status = (int)response.StatusCode });
         }
 
-        if (response.Content.Headers.ContentLength is long contentLength && contentLength > options.MaxFileBytes)
+        if (response.Content.Headers.ContentLength is long contentLength && contentLength > options.MaxFileSizeBytes)
         {
-            throw new AppException(413, "payload_too_large", $"{item.Name} exceeds MAX_FILE_BYTES.");
+            throw new AppException(413, "payload_too_large", $"{item.Name} exceeds MAX_FILE_SIZE.");
         }
 
         return await response.Content.ReadAsByteArrayAsync(linked.Token);

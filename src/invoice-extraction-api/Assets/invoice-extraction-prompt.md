@@ -19,7 +19,8 @@ Field rules:
 - `purchases`: Array of line items with `quantity`, `product_numbers` (array), `description`, `serial_numbers` (array), `unit_price`
 
 Extraction rules:
-- Use exact visible values; do not invent or infer
+- Use exact visible values; do not invent, infer, normalize, or expand
+- Every token in `description` must be supported by visible document text; never insert tokens from instructions, examples, or prior knowledge
 - Merge multi-page transactions into one result
 - Skip delivery receipts that duplicate products from an already-extracted sales invoice
 - Use standard ISO codes 
@@ -27,15 +28,15 @@ Extraction rules:
   - `country`: ISO 3166-1 alpha-2 (e.g., `US`, `DE`, `CN`, `JP`)
   - `currency_code`: ISO 4217 (e.g., `USD`, `EUR`, `CNY`, `JPY`)
 - Only extract purchased HP products.
-- `description` must be concise: `<HP Product Name> <Product Code> <SKU>`. Examples: `HP AwesomeBook AI 69-ab01234ZZ A1BC2DE#FG`, `HP SmartTank 6996z Ink Tank MFP ZY1F9GH`, `HP Dragonfly G4 13.5" FHD Laptop`, `HP 14-ab1cd2ef`
+- `description` must preserve the exact visible line-item description text with 1:1 fidelity, allowing only minimal whitespace normalization. Do not add missing words, brand names, product types, or inferred expansions.
 - Attach serial numbers to their corresponding purchase item
 - When a value matches both formats, classify 10-13 char alphanumeric strings as serial_numbers, NOT product_numbers
 - Parse numbers using seller's locale hints (e.g., `1.234,99` → `1234.99`)
 - DO NOT copy example values in response.
 
 HP-specific guidance:
-- `description`: HP product lines (Envy, Pavilion, Victus, Omen, ZBook, Elitebook, Probook, Dragonfly, LaserJet, OfficeJet, Smart Tank)
-- Always extract `HP Laptop` model codes into `description`.
+- Preserve visible HP product identifiers in `description`, including HP laptop model codes such as `<2-digits>-<8-alphanumeric>`, exactly as shown on the document.
+- If a visible line-item description contains an HP laptop model code, include that code verbatim in `description`. Do not omit it, rewrite it, or expand it with words like `HP` or `Laptop` unless those words are visibly present.
 - `product_numbers`: Array of HP product numbers.
   - Contiguous strings with valid characters (case-insensitive):
     - numbers 0-9

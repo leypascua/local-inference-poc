@@ -17,8 +17,9 @@ builder.Services.Configure<JsonOptions>(options =>
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<TempFileService>();
 builder.Services.AddSingleton<FileLoaderService>();
+builder.Services.AddSingleton<ImagePreparationService>();
 builder.Services.AddSingleton<PdfRasterizerService>();
-builder.Services.AddSingleton<VllmClient>();
+builder.Services.AddSingleton<OpenAiClient>();
 builder.Services.AddSingleton<ExtractionNormalizer>();
 builder.Services.AddSingleton<ExtractionPipelineService>();
 

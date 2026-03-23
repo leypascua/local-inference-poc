@@ -8,3 +8,4 @@ src/invoice-extraction/dist/
 src/invoice-extraction/.env
 
 .env
+*.sample.*

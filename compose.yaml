@@ -1,37 +1,35 @@
 services:
-  vllm-server:
-    build:
-      context: ./src/vllm-server
-    gpus: all
-    command: >-
-      --model zai-org/GLM-OCR
-      --host 0.0.0.0
-      --port 8080
-      --allowed-local-media-path /tmp/invoice-extraction
-      --trust-remote-code
-      --gpu-memory-utilization 0.80
-      --max-model-len 4096
-      --max-num-batched-tokens 4096
-      --enforce-eager
+  vllm:
+    image: vllm/vllm-openai:v0.18.0
+    container_name: vllm-qwen35-4b
+    restart: unless-stopped
     ports:
-      - 8080:8080
-    volumes:
-      - ~/.cache/huggingface:/root/.cache/huggingface
-      - ./tmp:/tmp/invoice-extraction
+      - "8000:8000"
+    ipc: host
+    gpus: all
     environment:
       HF_TOKEN: ${HF_TOKEN:-}
+    volumes:
+      - /mnt/greenova-models/.cache/huggingface:/root/.cache/huggingface
+    command: >
+      --model cyankiwi/Qwen3.5-2B-AWQ-4bit
+      --max-model-len 2048
+      --gpu-memory-utilization 0.88
+      --enable-prefix-caching
+      --trust-remote-code
+      --default-chat-template-kwargs '{"enable_thinking": false}'
 
   invoice-extraction-api:
     build:
       context: ./src/invoice-extraction-api
     depends_on:
-      - vllm-server
+      - vllm
     environment:
       PORT: 9998
       HOST: 0.0.0.0
       TEMP_DIR: /tmp/invoice-extraction
-      VLLM_BASE_URL: http://vllm-server:8080
-      VLLM_MODEL: zai-org/GLM-OCR
+      VLLM_BASE_URL: http://vllm:8000
+      VLLM_MODEL: ${VLLM_MODEL:-cyankiwi/Qwen3.5-4B-AWQ-4bit}
       ALLOW_REMOTE_URLS: "true"
       KEEP_DEBUG_FILES: "true"
       REQUEST_TIMEOUT_MS: 120000

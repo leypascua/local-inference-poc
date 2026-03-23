@@ -4,13 +4,12 @@ using invoice_extraction_api.Configuration;
 using invoice_extraction_api.Models;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp.Formats.Jpeg;
 
 namespace invoice_extraction_api.Services;
 
-public sealed class PdfRasterizerService(InvoiceExtractionOptions options)
+public sealed class PdfRasterizerService(InvoiceExtractionOptions options, ImagePreparationService imagePreparationService)
 {
-    public Task<List<PreparedImageFile>> RasterizePdfToImagesAsync(string requestDir, LoadedSourceFile sourceFile, CancellationToken cancellationToken)
+    public async Task<List<PreparedImageFile>> RasterizePdfToImagesAsync(string requestDir, LoadedSourceFile sourceFile, CancellationToken cancellationToken)
     {
         try
         {
@@ -32,18 +31,10 @@ public sealed class PdfRasterizerService(InvoiceExtractionOptions options)
 
                 using var image = Image.LoadPixelData<Bgra32>(rawBytes, width, height);
                 var fileName = FileNameService.BuildPdfPageFileName(sourceFile.StoredName, pageIndex + 1);
-                var filePath = Path.Combine(requestDir, fileName);
-
-                image.Save(filePath, new JpegEncoder { Quality = 90 });
-                images.Add(new PreparedImageFile
-                {
-                    FilePath = filePath,
-                    FileName = fileName,
-                    ContentType = "image/jpeg"
-                });
+                images.Add(await imagePreparationService.SavePdfPageAsync(requestDir, fileName, image, cancellationToken));
             }
 
-            return Task.FromResult(images);
+            return images;
         }
         catch (AppException)
         {

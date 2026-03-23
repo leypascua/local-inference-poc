@@ -8,12 +8,12 @@ public static class HealthEndpoints
 {
     public static async Task<IResult> GetHealthAsync(
         TempFileService tempFileService,
-        VllmClient vllmClient,
+        OpenAiClient openAiClient,
         InvoiceExtractionOptions options,
         CancellationToken cancellationToken)
     {
         await tempFileService.EnsureTempRootAsync(cancellationToken);
-        var ready = await vllmClient.CheckReadinessAsync(options, cancellationToken);
+        var ready = await openAiClient.CheckReadinessAsync(options, cancellationToken);
 
         return Results.Json(new
         {
@@ -21,22 +21,22 @@ public static class HealthEndpoints
             checks = new
             {
                 temp_dir = "ok",
-                llama_cpp = ready ? "ok" : "unavailable"
+                upstream_api = ready ? "ok" : "unavailable"
             }
         }, statusCode: ready ? 200 : 503);
     }
 
     public static async Task<IResult> GetReadyAsync(
         TempFileService tempFileService,
-        VllmClient vllmClient,
+        OpenAiClient openAiClient,
         InvoiceExtractionOptions options,
         CancellationToken cancellationToken)
     {
         await tempFileService.EnsureTempRootAsync(cancellationToken);
-        var ready = await vllmClient.CheckReadinessAsync(options, cancellationToken);
+        var ready = await openAiClient.CheckReadinessAsync(options, cancellationToken);
         if (!ready)
         {
-            throw new AppException(503, "service_unavailable", "vLLM is not ready.");
+            throw new AppException(503, "service_unavailable", "OpenAI-compatible upstream is not ready.");
         }
 
         return Results.Json(new { status = "ready" });
