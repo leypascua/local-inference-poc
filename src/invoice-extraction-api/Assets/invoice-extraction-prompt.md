@@ -1,14 +1,14 @@
-Task: 
+TASK:  
 Extract proof-of-purchase data from commercial documents (invoices, receipts, delivery receipts, purchase orders). Return `{"results":[]}` if no qualifying document found.
 
-Output contract:
+OUTPUT CONTRACT:  
 - Output must be a single parseable JSON object
 - No markdown, code fences, prose, or trailing text
 - Start with `{` and end with `}`
 - Use `null` for unknown/missing scalar values
 - Use `[]` for missing arrays
 
-Field rules:
+FIELD RULES:  
 - `document_title`: Document type only - one of: "invoice", "sales invoice", "receipt", "delivery receipt", "purchase order", "credit memo", "debit note", or `null`. NOT a product name, company name, or content title.
 - `invoice_date`: Format as `YYYY-MM-DD` or `null`. Use the `seller.country` to determine format in document and normalize extracted value to `<year>-<month>-<day>`.
 - `invoice_number`: Main transaction identifier
@@ -17,67 +17,80 @@ Field rules:
 - `seller`: Merchant/vendor with `name`, `city`, `state`, `country`
 - `end_customer`: Buyer/recipient with `name`, `city`, `state`, `country`, `email`
 - `purchases`: Array of line items with `quantity`, `product_numbers` (array), `description`, `serial_numbers` (array), `unit_price`
+- `description`: Must describe an eligible HP product (e.g,. computers, printers, print supplies). Examples: "Victus 16-bs0253mf", "HP DesignJet T6996 MFP XY9P8WL#JXL", "HP 69X Gold Original LaserJet Toner Cartridge"
 
-Extraction rules:
-- Use exact visible values; do not invent, infer, normalize, or expand
-- Every token in `description` must be supported by visible document text; never insert tokens from instructions, examples, or prior knowledge
-- Merge multi-page transactions into one result
-- Skip delivery receipts that duplicate products from an already-extracted sales invoice
-- Use standard ISO codes 
-  - `invoice_date`: ISO 8601 (e.g., `2026-03-16`, `1959-12-13`)
-  - `country`: ISO 3166-1 alpha-2 (e.g., `US`, `DE`, `CN`, `JP`)
-  - `currency_code`: ISO 4217 (e.g., `USD`, `EUR`, `CNY`, `JPY`)
-- Only extract purchased HP products.
-- `description` must preserve the exact visible line-item description text with 1:1 fidelity, allowing only minimal whitespace normalization. Do not add missing words, brand names, product types, or inferred expansions.
-- Attach serial numbers to their corresponding purchase item
-- When a value matches both formats, classify 10-13 char alphanumeric strings as serial_numbers, NOT product_numbers
-- Parse numbers using seller's locale hints (e.g., `1.234,99` → `1234.99`)
-- DO NOT copy example values in response.
+EXTRACTION RULES:  
+1. **HP Products Only**: Only extract line items that are known HP Products.
+2. **Date**: Normalize ALL dates to YYYY-MM-DD. Do not rely on country to guess format.
+3. **Country**: Normalize country names to ISO 3166-1 alpha-2 (e.g., "United States" -> "US").
+4. **Currency**: Normalize to ISO 4217 (e.g., "$" -> "USD").
+5. **Fidelity**: Copy text verbatim for `description`. Do not add words like "HP" if not visible.
+6. **Numeric amounts**: `gross_amount`, `unit_price` and `quantity` as JSON numbers using visible document locale cues
+7. **Multi-page transactions**: Merge into one result
+9. **Related documents**: Skip documents that supplement an already-extracted purchase (example: Invoice on page 1, delivery receipt on page 2- Only extract invoice)
+10. **DO NOT COPY**: Sample values in response.
 
-HP-specific guidance:
-- Preserve visible HP product identifiers in `description`, including HP laptop model codes such as `<2-digits>-<8-alphanumeric>`, exactly as shown on the document.
-- If a visible line-item description contains an HP laptop model code, include that code verbatim in `description`. Do not omit it, rewrite it, or expand it with words like `HP` or `Laptop` unless those words are visibly present.
-- `product_numbers`: Array of HP product numbers.
-  - Contiguous strings with valid characters (case-insensitive):
-    - numbers 0-9
-    - letters a-z 
-    - symbols dash ('-') and pound ('#') only
-  - There are 2 types of product numbers: 
-    - SKU: EXACTLY 7 chars (e.g., `AB1C2DE`) OR 11 chars with `#` in position 8 (e.g., `AB1C2DE#EFG`). Values of 10-13 chars without `#` are serial_numbers, NOT product_numbers.  
-    - HP Laptop Model: `<2-digits>-<8-alphanumeric>`. Examples: `13-fa5yx4au`, `15-tf392kph`
-  - Extracted value for `product_number` must exist in actual `description` or dedicated product number column (e.g., `part_number`, `item_number`, `article_number`, `product_number`)
-- `serial_numbers`: 10-13 alphanumeric chars, no prefixes. Examples: `AB123456789`, `PH382F31US`, `5CG538240Z`. Usually preceded by labels: `SN#`, `Serial:`, `SNo:`, `SN:`. These are NOT product_numbers.
+PURCHASES EXTRACTION RULES: 
+1. Required fields: `description`, `unit_price`. 
+2. Prioritize line-items that satisfy HP PRODUCT IDENTIFICATION LOGIC
+3. Use MATCHING CRITERIA for `product_numbers` and `serial_numbers`, set to "[]" if no matches can be found.
 
-Example output (format only - never copy these placeholder values):
+HP PRODUCT IDENTIFICATION LOGIC (CRITICAL):  
+- Look for text in the "Description" or "Item" column.
+- Locate known Hewlett-Packard (HP) Product Lines (e.g., notebook, desktop, printer, ink cartridge, toner) in `description`
+- Also search and extract from the "Product Number" column when one exists (alternate column headers: "SKU", "Part No.", "Article Nr.")
+- HP Laptop Model Code: Matches pattern "<2-digits>-<8-alphanumeric>" (e.g., "13-fa5yx4au"). Extract this into `product_numbers`.
+- If a visible line-item description contains an HP Laptop Model Code, include that code verbatim in `description`. Do not omit it, rewrite it, or expand it with words like "HP" or "Laptop" unless visibly present.
+
+PRODUCT NUMBER MATCHING CRITERIA:  
+Extract strings from line-item table into `product_numbers` that match ONE of these patterns
+
+1. SKU  
+- Syntax: <7-alphanumeric>
+- Example: "AB1C2DE", "ZX9C8VB"  
+- Ignore: "1234567" (all numbers), "ABCDEFG" (all letters), "A321JF" (too short), "8ZZY987H54" (too long)
+
+2. SKU with suffix  
+- Syntax: <7-alphanumeric>#<3-alphanumeric> 
+- Example: "AB1C2DE#EFG", "ZX9C8VB#MSP", "C5GQ2YK#YYD"
+- Ignore: "38123991321" (all numbers), "8WZY987H54" (too short, missing '#'), "213AB3X/442" (Invalid characters)
+
+3. HP Laptop model 
+- Syntax: <2-digits>-<8-alphanumeric>
+- Example: "15-tf392kph", "42-HK281JUS" "14-WL1144TR"
+- Ignore: "i7-13800HX" (processor model), "13/TG123AU" (Invalid separator)  
+
+SERIAL NUMBER MATCHING CRITERIA:  
+Extract strings from line-item table into `serial_numbers` that match these criteria:  
+- Syntax: <10 alphanumeric>, no spaces, no symbols, no prefixes in the value.
+- Example: "8CF9873K24", "5CG538240Z", "PH382F31US"
+- Ignore: "12345-6789" (Wrong format, invalid symbols), "3901938237" (all numbers)
+- Hint: Usually found beside known labels (e.g., "SN:", "Serial:", "SNo.", "SN#")
+
+EXAMPLE OUTPUT:  
 {
   "results": [
     {
-      "document_title": "<document_title>",
-      "invoice_date": "YYYY-MM-DD",
-      "invoice_number": "<invoice_number>",
-      "currency_code": "<currency-iso-code>",
+      "document_title": "string | null",
+      "invoice_date": "YYYY-MM-DD | null",
+      "invoice_number": "string | null",
+      "currency_code": "string | null",
       "gross_amount": 0.00,
       "seller": {
-        "name": "<seller.name>",
-        "city": "<seller.city>",
-        "state": "<seller.state>",
-        "country": "<country-iso-code>"
+        "name": "string | null",
+        "city": "string | null",
+        "state": "string | null",
+        "country": "string | null"
       },
       "end_customer": {
-        "name": "<end_customer.name>",
-        "city": "<end_customer.city>",
-        "state": "<end_customer.state>",
-        "country": "<country-iso-code>",
+        "name": "string | null",
+        "city": "string | null",
+        "state": "string | null",
+        "country": "string | null",
         "email": null
       },
       "purchases": [
-        {
-          "quantity": 1,
-          "product_numbers": ["<product_numbers[0]>", "<product_numbers[1]>"],
-          "description": "<description>",
-          "serial_numbers": ["<serial_numbers[0]>"],
-          "unit_price": 0.00
-        }
+        {"quantity": 1,"product_numbers": [],"description": "string","serial_numbers": [],"unit_price": 0.00}
       ]
     }
   ]

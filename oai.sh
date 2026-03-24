@@ -263,7 +263,7 @@ system_prompt = prompt_text + "\n\nReturn JSON only. Do not wrap the JSON in mar
 body = {
     "model": model_name,
     "max_tokens": max_tokens,
-    "temperature": 0,
+    "temperature": 0.1,
     "messages": [
         {
             "role": "system",
