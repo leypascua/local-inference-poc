@@ -1,0 +1,111 @@
+{
+  "name": "extract_proof_of_purchase",
+  "strict": true,
+  "schema": {
+    "type": "object",
+    "properties": {
+      "docs": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "is_eligible": {
+              "type": "boolean"
+            },
+            "ineligibility_reason": {
+              "type": ["string", "null"]
+            },
+            "document_title": {
+              "type": ["string", "null"]
+            },
+            "document_number": {
+              "type": ["string", "null"]
+            },
+            "purchase_date": {
+              "type": ["string", "null"]
+            },
+            "currency_iso_code": {
+              "type": ["string", "null"]
+            },
+            "grand_total": {
+              "type": ["number", "null"]
+            },
+            "seller": {
+              "type": ["object", "null"],
+              "properties": {
+                "name": {
+                  "type": ["string", "null"]
+                },
+                "city": {
+                  "type": ["string", "null"]
+                },
+                "country_iso_code": {
+                  "type": ["string", "null"]
+                }
+              },
+              "required": ["name", "city", "country_iso_code"],
+              "additionalProperties": false
+            },
+            "buyer": {
+              "type": ["object", "null"],
+              "properties": {
+                "name": {
+                  "type": ["string", "null"]
+                },
+                "city": {
+                  "type": ["string", "null"]
+                },
+                "email": {
+                  "type": ["string", "null"]
+                }
+              },
+              "required": ["name", "city", "email"],
+              "additionalProperties": false
+            },
+            "line_items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "description": {
+                    "type": "string"
+                  },
+                  "quantity": {
+                    "type": "number"
+                  },
+                  "unit_price": {
+                    "type": "number"
+                  },
+                  "product_code": {
+                    "type": "string"
+                  },
+                  "part_number": {
+                    "type": "string"
+                  },
+                  "article_number": {
+                    "type": "string"
+                  }
+                },
+                "required": ["description", "quantity", "unit_price"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "is_eligible",
+            "ineligibility_reason",
+            "document_title",
+            "document_number",
+            "purchase_date",
+            "currency_iso_code",
+            "grand_total",
+            "line_items"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": ["docs"],
+    "additionalProperties": false
+  }
+}
