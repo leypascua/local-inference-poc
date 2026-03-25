@@ -12,14 +12,32 @@ Respond with only valid JSON. No markdown, no explanations, no comments, no trai
 # LINE ITEMS RULES
 - Extract each row from the document's line-item table into the line_items array.
 - Each item must have: description, quantity, unit_price.
-- If the table has a dedicated column for product codes, part numbers, or article numbers, include it as product_code, part_number, or article_number. Map the column header to the closest match.
-- Do not invent keys beyond: description, quantity, unit_price, product_code, part_number, article_number, serial_number.
-- Omit optional keys entirely if the table has no column for them.
+- Do not invent keys beyond: description, quantity, unit_price, product_model, serial_number.
+- Omit optional keys entirely if no value is found for a row.
 - Keep the same keys for every row in the same document.
+
+# PRODUCT MODEL EXTRACTION
+- For each line item, scan ALL columns (description, product code, part number, article number, SKU, etc.) for strings matching any pattern below.
+- Collect every match into the product_model array (string[]). If no match is found, omit product_model for that row.
+- Each match must contain both letters and digits.
+
+Valid patterns:
+1. SKU — exactly 7 alphanumeric characters. Example: "AB1C2DE". Reject all-digits ("1234567") or all-letters ("ABCDEFG").
+2. SKU with suffix — 7 alphanumeric, "#", 3 alphanumeric. Example: "AB1C2DE#EFG", "C5GQ2YK#YYD".
+3. HP laptop model — 2 digits, "-", 8 alphanumeric. Example: "15-tf392kph", "14-WL1144TR". Reject processor models (e.g., "i7-13800HX").
+
+NOT a product_model (do not extract):
+- "38612" — too short
+- "8ZZY987H54" — too long (10 chars, not 7)
+- "1234567" — all digits, no letters
+- "ABCDEFG" — all letters, no digits
+- "3812399#XYZA" — all digits, wrong length
+- "i7-13800HX" — processor model, not a product model
+- "213AB3X/442" — contains invalid character "/"
 
 # SERIAL NUMBER EXTRACTION
 - Contiguous 10-character alphanumeric string (letters and digits only, no spaces, or symbols). Examples: CN12Y3N95A, 8C6H123V3X.
-- Search within the description column text, often prefixed by a label (e.g., Serial:, SNo., SN#, or SerialNo.)
+- Search within the description column text, often prefixed by a label (e.g., Serial:, SNo., SN#, ASIN)
 - For each line item, scan its description text for tokens matching the pattern [A-Z0-9]{10}. Extract each match to the serial_number array.
 - Do not remove serial numbers from description.
 - If no serial number is found in a line item, omit the serial_number key for that row.
@@ -44,7 +62,8 @@ Respond with only valid JSON. No markdown, no explanations, no comments, no trai
       "seller": {"name": "TechParts GmbH", "city": "Munich", "country_iso_code": "DE"},
       "buyer": {"name": "Acme Corp", "city": "Berlin", "email": "purchasing@acme.de"},
       "line_items": [
-        {"description": "XY ColorJet 420ai 69\" MFP 9S8V69H#XYZ Serial: CN12Y3N95A", "quantity": 2, "unit_price": 540.00, "product_code": "9S8V69H#XYZ", "serial_number": ["CN12Y3N95A"]}
+        {"description": "XY ColorJet 420ai 69\" MFP 9S8V69H#XYZ Serial: CN12Y3N95A", "quantity": 1, "unit_price": 12345.67, "product_model": ["9S8V69H#XYZ"], "serial_number": ["CN12Y3N95A"]},
+        {"description": "XY Laptop 23-tf420xph PNo. 9S8V69H SN#: 8Z12Y3N69X", "quantity": 1, "unit_price": 891.11, "product_model": ["23-tf420xph", "9S8V69H"], "serial_number": ["8Z12Y3N69X"]}
       ]
     }
   ]

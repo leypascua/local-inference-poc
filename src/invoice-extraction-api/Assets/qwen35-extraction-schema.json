@@ -76,14 +76,11 @@
                   "unit_price": {
                     "type": "number"
                   },
-                  "product_code": {
-                    "type": "string"
-                  },
-                  "part_number": {
-                    "type": "string"
-                  },
-                  "article_number": {
-                    "type": "string"
+                  "product_model": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
                   },
                   "serial_number": {
                     "type": "array",
