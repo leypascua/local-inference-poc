@@ -21,7 +21,8 @@ Usage: $0 --input image.jpg --prompt instructions.md [OPTIONS]
 Options:
   --input PATH    Input document image, PDF, or HTTP/S URL (required)
   --prompt PATH   Prompt text file (required)
-  --schema PATH   JSON schema file for structured output
+  --json-object [PATH]
+                  Return JSON object output, or use PATH as a JSON schema file
   --dpi N         DPI for PDF rasterization (default: 150, lower uses less memory)
   --quality N     JPEG quality for PDF pages (default: 85, lower uses less memory)
   --max-dim N     Maximum pixel dimension for the longest image edge (default: 1568)
@@ -75,7 +76,8 @@ mime_type_for_file() {
 
 INPUT_PATH=""
 PROMPT_PATH=""
-SCHEMA_PATH=""
+JSON_OBJECT_MODE=""
+JSON_OBJECT_PATH=""
 PDF_DPI="150"
 JPEG_QUALITY="85"
 MAX_DIM="$MAX_DIM_DEFAULT"
@@ -93,10 +95,15 @@ while (($# > 0)); do
       PROMPT_PATH="$2"
       shift 2
       ;;
-    --schema)
-      (($# >= 2)) || die "--schema requires a value"
-      SCHEMA_PATH="$2"
-      shift 2
+    --json-object)
+      JSON_OBJECT_MODE="json_object"
+      if (($# >= 2)) && [[ ! "$2" =~ ^-- ]]; then
+        JSON_OBJECT_MODE="json_schema"
+        JSON_OBJECT_PATH="$2"
+        shift 2
+      else
+        shift
+      fi
       ;;
     --dpi)
       (($# >= 2)) || die "--dpi requires a value"
@@ -140,8 +147,8 @@ fi
 
 [[ -f "$INPUT_PATH" ]] || die "Input file not found: $INPUT_PATH"
 [[ -f "$PROMPT_PATH" ]] || die "Prompt file not found: $PROMPT_PATH"
-if [[ -n "$SCHEMA_PATH" ]]; then
-  [[ -f "$SCHEMA_PATH" ]] || die "Schema file not found: $SCHEMA_PATH"
+if [[ -n "$JSON_OBJECT_PATH" ]]; then
+  [[ -f "$JSON_OBJECT_PATH" ]] || die "JSON schema file not found: $JSON_OBJECT_PATH"
 fi
 
 require_command curl
@@ -179,7 +186,7 @@ else
   trap 'rm -f "$RESPONSE_FILE" "$DOWNLOADED_FILE"' EXIT
 fi
 
-python3 - "$INPUT_PATH" "$INPUT_MIME_TYPE" "$PROMPT_PATH" "$SCHEMA_PATH" "$MODEL" "$THINKING" "$MAX_TOKENS" "$MAX_DIM" "$JPEG_QUALITY" <<'PY' \
+python3 - "$INPUT_PATH" "$INPUT_MIME_TYPE" "$PROMPT_PATH" "$JSON_OBJECT_MODE" "$JSON_OBJECT_PATH" "$MODEL" "$THINKING" "$MAX_TOKENS" "$MAX_DIM" "$JPEG_QUALITY" <<'PY' \
 | curl -sS -X POST "${BASE_URL%/}/v1/chat/completions" \
     -H "Content-Type: application/json" \
     "${AUTH_ARGS[@]}" \
@@ -202,12 +209,13 @@ def read_text(path_str: str) -> str:
 input_path = pathlib.Path(sys.argv[1])
 input_mime_type = sys.argv[2] or mimetypes.guess_type(str(input_path))[0] or "application/octet-stream"
 prompt_path = pathlib.Path(sys.argv[3])
-schema_arg = sys.argv[4]
-model_name = sys.argv[5]
-thinking_enabled = sys.argv[6] == "true"
-max_tokens = int(sys.argv[7])
-max_dim = int(sys.argv[8])
-jpeg_quality = int(sys.argv[9])
+json_output_mode = sys.argv[4]
+json_schema_path = sys.argv[5]
+model_name = sys.argv[6]
+thinking_enabled = sys.argv[7] == "true"
+max_tokens = int(sys.argv[8])
+max_dim = int(sys.argv[9])
+jpeg_quality = int(sys.argv[10])
 
 prompt_text = read_text(str(prompt_path))
 if not prompt_text:
@@ -284,10 +292,12 @@ body = {
 if not thinking_enabled:
     body["reasoning_effort"] = "none"
 
-if schema_arg:
-    schema_text = read_text(schema_arg)
+if json_output_mode == "json_object":
+    body["response_format"] = {"type": "json_object"}
+elif json_output_mode == "json_schema":
+    schema_text = read_text(json_schema_path)
     if not schema_text:
-        raise SystemExit("Schema file is empty")
+        raise SystemExit("JSON schema file is empty")
     schema_wrapper = json.loads(schema_text)
     if "schema" in schema_wrapper:
         body["response_format"] = {
