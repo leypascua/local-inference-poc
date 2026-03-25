@@ -84,6 +84,12 @@
                   },
                   "article_number": {
                     "type": "string"
+                  },
+                  "serial_number": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
                   }
                 },
                 "required": ["description", "quantity", "unit_price"],
